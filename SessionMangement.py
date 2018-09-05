@@ -19,6 +19,7 @@ from utils import dumps_json
 from utils import write_2_file
 from utils import make_list
 from utils import wait_for_msg_list
+from utils import wait_for_msg
 
 
 class SessionMangement():
@@ -117,21 +118,6 @@ class SessionMangement():
         cookie_list = make_list(file_path=config.user_info_file, index='', blank='')
         return cookie_list
 
-    def choos_a_cookie(self, slave_count):
-        """设置一个偏移量
-        用来提取一个cookie
-        """
-        offset = int(redis_cli.get('cookie_offset').decode())
-        # 如果offset为空的时候，放入一个值 0, offset=cookie_len-1 代表cookie分派结束
-        if offset is None or offset == slave_count - 1:
-            offset = 0
-            redis_cli.set('cookie_offset', 0)
-        else:
-            # 接下来就是处理是否自增部分
-            # 偏移量要自增 1
-            offset += 1
-            redis_cli.set('cookie_offset', offset)
-        return offset
 
     def put_cookie_2_que(self, cookie):
         """
@@ -161,44 +147,80 @@ class SessionMangement():
 
         return is_break
 
+
+    def wait_mechanism(self):
+        """等待机制
+        当第一个出现的情况下被触发
+        """
+        count = 10
+        que = config.ssn_req
+        msg_list = wait_for_msg_list(que, count)
+        return msg_list
+
+    def choos_a_offset(self, cookie_len):
+        """选择一个偏移量来"""
+        offset = int(redis_cli.get('cookie_offset').decode())
+        if offset == cookie_len - 1:
+            offset = 0
+        else:
+            offset += 1
+        return offset
+
+    def decide_psuh_cookie_2_que(self, count):
+        """告知要推几个cookie到队里去"""
+        cookie_list = self.load_cookies_list()
+        cookie_len = len(cookie_list)
+        # 每一次都要讲offset重置
+        redis_cli.set('cookie_offset', 0)
+        if count == 0:
+            count = cookie_len
+        num = 1
+        while num <= count:
+            offset = self.choos_a_offset(cookie_len)
+            cookie = cookie_list[offset]
+            self.put_cookie_2_que(cookie)
+            num += 1
+        return
+
+
     def session_main_logic(self):
         """
         由slave调用的部分
         实例化后，实现登录
         在 删除,导入列表时候通过消息通信来完成
         需要加一个结束模块
+
+        #09-05 解决bug
+        等待机制:
+            当收到第一个请求触发
+            统计数量
+            放入队列
         """
         # 实例化我们的种子模块,并开始登录
         self.logic_add_cookie()
-        # 完成后像队里推送一条已完成
-        que = config.task_que
-        ctx = dumps_json({'session': 'done'})
+        # 并把所有的cookie都扔到消息队列里去
+        self.decide_psuh_cookie_2_que(0)
+
+        # 完成后像队里推送一条已完成启动
+        que = config.task_que_fb
+        ctx = dumps_json({'ssnm': 'done'})
         redis_cli.lpush(que, ctx)
+
         # 开始监听反馈队列
         ssn_req = config.ssn_req
-        is_break = False
-        while not is_break:
-            # 监听ssn_req队列，根据消息的条数，发放对应数量的cookie
-            msg_list = wait_for_msg_list(ssn_req)
-
-            # todo: 处理消息里的东西，比如删除id
-            is_break = self.deal_feed_back(msg_list)
-            if is_break:
-                break
-            # todo: 处理消息条数
-            # slave_count 当前需要cookie 的个数
-            slave_count = len(msg_list) if msg_list else 1
-            cookie_list = self.load_cookies_list()
-
-            # 开始之前将cookie_offset 置空
-            redis_cli.set('cookie_offset', slave_count)
-            while slave_count > 0:
-                # 相应的放对应的cookie数到队列里
-                current_offset = self.choos_a_cookie(slave_count)
-                cookie = cookie_list[current_offset]
-                # 放入队列:
-                self.put_cookie_2_que(cookie)
-                slave_count -= 1
+        while True:
+            msg = wait_for_msg(ssn_req)
+            # 当反馈队列里有消息时，激活cookie派发和处理
+            if msg:
+                # 是确保msg真实存在
+                # 接下来获取 msg_list
+                msg_list = self.wait_mechanism()
+                msg_list.append(msg)
+                # 先处理cookie
+                self.deal_feed_back(msg_list)
+                # 再是放cookie到队列
+                msg_len = len(msg_list)
+                self.decide_psuh_cookie_2_que(msg_len)
 
 
 

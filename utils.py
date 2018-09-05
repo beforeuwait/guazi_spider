@@ -176,10 +176,14 @@ def wait_for_msg(que):
             break
     return data
 
-def wait_for_msg_list(que):
+def wait_for_msg_list(que, count):
     """等待指定队列返回的数据列表
+    还有个指定的列表长度
     这里有个时间约束
     等待最多30秒
+
+    # 09-05 这里发现一个bug，就是无论是否有数据都要等30秒
+    当列表达到count or 30秒后， 这里都循环结束
     """
     start = time.time()
     data = []
@@ -188,6 +192,8 @@ def wait_for_msg_list(que):
         if redis.exists(que):
             msg = redis.rpop(que)
             data.append(loads_json(translate_2_json_dict(msg)))
+            if len(data) == count:
+                break
         time.sleep(0.1)
         now = time.time()
         if now - start > 30:

@@ -8,6 +8,9 @@
         1. 生产种子
         2. 要cookie
         3. 派发种子
+
+    # 2018-09-05 更改逻辑
+        todo: 在派发种子一次丢固定的种子数量, 然后监听反馈队列
 """
 
 import config
@@ -17,7 +20,7 @@ from SeedsHandler import seeds_maker
 from SeedsHandler import loads_seed_in_generator
 from utils import loads_json
 from utils import dumps_json
-from utils import wait_for_msg_list
+from utils import wait_for_msg
 
 class SeedsMangement():
     """种子管理器
@@ -62,6 +65,37 @@ class SeedsMangement():
         que = config.task_que
         redis_cli.lpush(que, dumps_json(seed))
 
+    def decide_push_seed_2_queue(self, count):
+        """拿到种子，将种子推入队列里"""
+        is_break = False
+        if count == 0:
+            count = 20
+
+        num = 1
+        while num <= count:
+            seed = self.take_out_a_seed()
+            if not seed:
+                is_break = True
+                break
+            self.push_seed_2_queue(seed)
+            num += 1
+
+        return is_break
+
+    def deal_feed_back(self, msg):
+        """
+        消息传递过来就是种子信息，通过解析种子里的cookie_status
+        如果cookie_status 为 1 就代表需要删除cookiel
+        如果出现stop_sign， 则代表slave长时间没有拿到seed后，默认结束
+        """
+        is_deal = False
+        if msg.get('cookie_status') == 1:
+            # 这就代表要删除该种子要重新投放了
+            # 开始处理
+            is_deal = True
+        return is_deal
+
+
     def seed_main_logic(self):
         """
         主要处理逻辑
@@ -69,26 +103,32 @@ class SeedsMangement():
         2. 提取种子
         3. 检测状态
         """
+        # 完成后像队里推送一条已完成启动
+        que = config.task_que_fb
+        ctx = dumps_json({'sedm': 'done'})
+        redis_cli.lpush(que, ctx)
 
         # 第一步就是生产种子
         self.seeds_maker()
-        que_req = config.sed_req
+        # 完了后先丢20个种子
+        is_break = self.decide_push_seed_2_queue(0)
+
         # 开始监听队列，准备投放种子
-        is_break = False
+        que_req = config.sed_req
         while not is_break:
-            # 等待确认投放种子数量
-            seeds_request = wait_for_msg_list(que_req)
-            count = len(seeds_request)
-            # 如果count 是 0 ,投放 1个种子
-            while count >= 0:
-                seed = self.take_out_a_seed()
-                # 放入队列中
-                if seed is not None:
-                    self.push_seed_2_queue(seed)
+            msg = wait_for_msg(que_req)
+            if msg:
+                # 开始处理这个反馈
+                # 主要看 cookie_status
+                is_deal = self.deal_feed_back(msg)
+                if is_deal:
+                    msg.update({'cookie_status': 0})
+                    self.push_seed_2_queue(msg)
+                    continue
                 else:
-                    # 种子投放完毕，退出，该seed mangement职责完成
-                    is_break = True
-                    break
+                    # 通过的话，则上传一个新的种子
+                    self.decide_push_seed_2_queue(1)
+
 
 """
     # 旧代码

@@ -37,6 +37,8 @@ redis_cli = connect_redis()
 
 task_que = 'TaskQue'
 
+task_que_fb = 'TaskQueFb'
+
 # session请求队列
 ssn_req = 'ssnreq'
 
@@ -48,6 +50,9 @@ ssn_status = 'ssnsts'
 
 # seed请求队列
 sed_req = 'sedreq'
+
+# 持久化队列
+psm_que = 'psmque'
 
 """
 task_que_fb = 'TaskQueueFB'
