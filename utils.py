@@ -169,11 +169,26 @@ def wait_for_msg(que):
         if redis.exists(que):
             msg = redis.rpop(que)
             data = loads_json(translate_2_json_dict(msg))
+            data = loads_json(data)
             break
         time.sleep(0.1)
         now = time.time()
         if now - start > 30:
             break
+    return data
+
+def wait_for_msg_long(que):
+    """等待指定队列返回数据
+    不停的等
+    """
+    redis = redis_cli
+    while True:
+        if redis.exists(que):
+            msg = redis.rpop(que)
+            data = loads_json(msg)
+            break
+        time.sleep(0.1)
+
     return data
 
 def wait_for_msg_list(que, count):

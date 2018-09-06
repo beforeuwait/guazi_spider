@@ -23,8 +23,12 @@ from utils import make_generator
 from utils import make_list
 from utils import dumps_json
 from utils import write_2_file
+from utils import initial_file
+from utils import file_content
+from utils import overwrite_file
 
 
+epoh_file = './DB/epoh.txt'
 serise_file = './DB/all_serise.csv'
 city_list_file = './DB/city_list.csv'
 seed_file = './DB/seeds_store.txt'
@@ -32,14 +36,18 @@ seed_url = 'https://www.guazi.com/{0}/dealrecord?tag_id={1}&date={2}00'
 blank = '\t'
 
 seed_demo = {
+        'brand_id': '',
         'brand': '',
+        'serise_id': '',
         'serise': '',
+        'p_type': '',
         'url': '',
         'check_city': '',
-        'check_year': '',
-        'check_month': '',
+        'date': '',
         'cookie': {},
+        'data': [],
         'cookie_status': 0,
+        'epoh': 0,
     }
 
 # 第一步就是更新品牌和车系的数据
@@ -50,6 +58,7 @@ def update_brands_serise():
     :return:
     """
     main_get_brands_serises()
+
     return
 
 # 第二步就是生产种子过程了
@@ -62,7 +71,9 @@ def seeds_maker():
     生成一个车型的全部请求的url,包含用不同的城市，以及不同的月份
     虽然结果都是展示的当前月份
     seed = {
+        'brand_id': xxx,
         'brand': xxxx,
+        'serise_id': xxx,
         'serise': xxxx,
         'url': xxxxx,
         'check_city': xxxx,
@@ -70,14 +81,19 @@ def seeds_maker():
         'check_month': xxxx,
         'cookie': {},
         'cookie_status': 0,
+        'data': [],
     }
     """
+    initial_file(seed_file)
+    epoh = int(file_content(epoh_file))
+    seed_demo.update({'epoh': epoh + 1})
     serise_list = make_generator(serise_file, blank=blank)
     for each in serise_list:
-        construct_seed(each[2], each[1], each[-2])
+        construct_seed(each[2], each[1], each[-2], each[0], each[-1])
+    overwrite_file(epoh_file, str(epoh + 1))
     return
 
-def construct_seed(serise_id, brand, serise):
+def construct_seed(serise_id, brand, serise, brand_id, p_type):
     """这里是seed的装配厂"""
     #   首先确定年份和月份
     current_year = datetime.datetime.today().strftime("%Y")
@@ -92,25 +108,29 @@ def construct_seed(serise_id, brand, serise):
         if year != int(current_year):
             for m in [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]:
                 city = random.choice(city_list)
-                url = seed_url.format(city, serise_id, ''.join([str(year), str(random.choice(m))]))
-                insert_seed_save(url, brand, serise, city, year, m)
+                month = str(random.choice(m))
+                url = seed_url.format(city, serise_id, ''.join([str(year), month]))
+                insert_seed_save(url, brand, serise, city, str(year) + '-' + month, brand_id, serise_id, p_type)
         else:
             # 当前年份
             for m in range(1, int(current_month) + 1):
                 city = random.choice(city_list)
-                url = seed_url.format(city, serise_id, ''.join([str(year), str(m)]))
-                insert_seed_save(url, brand, serise, city, year, m)
+                month = str(m)
+                url = seed_url.format(city, serise_id, ''.join([str(year), month]))
+                insert_seed_save(url, brand, serise, city, str(year) + '-' + month, brand_id, serise_id, p_type)
     return
 
-def insert_seed_save(url, brand, serise, city, year, month):
+def insert_seed_save(url, brand, serise, city, date, brand_id, serise_id, p_type):
     """注入seed以及保存"""
     seed = deepcopy(seed_demo)
     seed.update({'url': url,
+                 'brand_id': brand_id,
                  'brand': brand,
+                 'serise_id': serise_id,
                  'serise': serise,
                  'check_city': city,
-                 'check_year': year,
-                 'check_month': month,
+                 'date': date,
+                 'p_type': p_type
                  })
     write_2_file(seed_file, dumps_json(seed))
     del seed

@@ -30,7 +30,8 @@ import config
 from config import redis_cli
 from SessionMangement import SessionMangement
 from SeedsMangement import SeedsMangement
-from PersistenceMangement import PersistenceMangement
+from PersistenceMangement import listn_the_psm_que
+from SpiderHandler import SpiderHandler
 from utils import translate_2_json_dict
 from utils import loads_json
 
@@ -57,7 +58,8 @@ def listen_task_que():
             msg = redis_cli.rpop(que)
             # 开始分类msg属于什么任务:
             #
-            msg_dict = loads_json(translate_2_json_dict(msg))
+            msg_dict = loads_json(msg)
+            print('收到数据')
             # 开始分类:
             if msg_dict.get('command'):
                 # 这里commend
@@ -69,8 +71,9 @@ def listen_task_que():
                     sm = SeedsMangement()
                     sm.seed_main_logic()
                 else:
-                    psm = PersistenceMangement()
-                    # todo: 添加主要方法
+                    # 化身持久化模块
+                    listn_the_psm_que()
+
             else:
                 # 那就是种子了
                 # 这里要做的事情有
@@ -78,8 +81,13 @@ def listen_task_que():
                 # 2. 完成html的请求
                 # 3. data放入psm队列里
                 # 4. 反馈给seesion/seed模块
+                time.sleep(2)
                 seed = msg_dict
                 # 调度spider
+                sp = SpiderHandler()
+                sp.receive_seed_and_start_crawl(seed)
+                # 结束上一个，等下一个种子
+                del sp
 
         time.sleep(0.1)
 

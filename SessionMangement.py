@@ -7,10 +7,16 @@
     # 响应党的号召，给schedule减负
     # 由slave节点来调用该模块，从而开始sessoin之路
 
+    # 09-06:
+        思路再次更变
+        cookie的派发是来一个请求发一个
+        不用等大家
+
 """
 
 import os
 import config
+import datetime
 from config import redis_cli
 from LoginHandler import main_theme
 from utils import initial_file
@@ -19,7 +25,7 @@ from utils import dumps_json
 from utils import write_2_file
 from utils import make_list
 from utils import wait_for_msg_list
-from utils import wait_for_msg
+from utils import wait_for_msg_long
 
 
 class SessionMangement():
@@ -124,6 +130,7 @@ class SessionMangement():
         将cookie放入队列里
         """
         que = config.ssn_rep
+        cookie = loads_json(cookie)
         redis_cli.lpush(que, dumps_json(cookie))
 
     def deal_feed_back(self, msg_list):
@@ -196,10 +203,11 @@ class SessionMangement():
             统计数量
             放入队列
         """
+        print('session管理已启动')
         # 实例化我们的种子模块,并开始登录
         self.logic_add_cookie()
-        # 并把所有的cookie都扔到消息队列里去
-        self.decide_psuh_cookie_2_que(0)
+        # # 并把所有的cookie都扔到消息队列里去
+        # self.decide_psuh_cookie_2_que(0)
 
         # 完成后像队里推送一条已完成启动
         que = config.task_que_fb
@@ -207,9 +215,19 @@ class SessionMangement():
         redis_cli.lpush(que, ctx)
 
         # 开始监听反馈队列
+        print('开始监听ssn_req队列')
         ssn_req = config.ssn_req
         while True:
-            msg = wait_for_msg(ssn_req)
+            msg_list = []
+            msg = wait_for_msg_long(ssn_req)
+            print(datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S'), '\t接受反馈')
+            msg_list.append(msg)
+            # 只要有消息来了,先处理,再就发一条cookie出去
+            self.deal_feed_back(msg_list)
+            self.decide_psuh_cookie_2_que(1)
+            print('完成种子派发\n')
+
+            """
             # 当反馈队列里有消息时，激活cookie派发和处理
             if msg:
                 # 是确保msg真实存在
@@ -221,6 +239,7 @@ class SessionMangement():
                 # 再是放cookie到队列
                 msg_len = len(msg_list)
                 self.decide_psuh_cookie_2_que(msg_len)
+            """
 
 
 

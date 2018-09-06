@@ -65,7 +65,7 @@ def wait_feed_back():
     while True:
         if redis_cli.exists(que):
             # 说明有反馈了，把该条数据拿出来
-            redis_cli.rpop()
+            redis_cli.rpop(que)
             break
         time.sleep(0.1)
 

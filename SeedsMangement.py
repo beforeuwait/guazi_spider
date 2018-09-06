@@ -18,6 +18,7 @@ from config import logger
 from config import redis_cli
 from SeedsHandler import seeds_maker
 from SeedsHandler import loads_seed_in_generator
+from SeedsHandler import update_brands_serise
 from utils import loads_json
 from utils import dumps_json
 from utils import wait_for_msg
@@ -103,12 +104,16 @@ class SeedsMangement():
         2. 提取种子
         3. 检测状态
         """
+        print('seed管理已启动')
         # 完成后像队里推送一条已完成启动
         que = config.task_que_fb
         ctx = dumps_json({'sedm': 'done'})
         redis_cli.lpush(que, ctx)
 
+        # 更新车系
+        update_brands_serise()
         # 第一步就是生产种子
+        print('生产种子')
         self.seeds_maker()
         # 完了后先丢20个种子
         is_break = self.decide_push_seed_2_queue(0)
