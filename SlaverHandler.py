@@ -27,12 +27,13 @@
 
 import time
 import config
+import random
+import datetime
 from config import redis_cli
 from SessionMangement import SessionMangement
 from SeedsMangement import SeedsMangement
 from PersistenceMangement import listn_the_psm_que
 from SpiderHandler import SpiderHandler
-from utils import translate_2_json_dict
 from utils import loads_json
 
 
@@ -48,18 +49,40 @@ def listen_task_que():
         seed管理: sedm
         persistence管理: psm
 
-    引入sub广播
+    # 09-07更新。需要为每一个节点打上一个标记
+        为了不放js文件混乱，才这样的。
 
     """
-    que = config.task_que
+    task_que = config.task_que
+    mark_que = config.mark_que
+    # 在监听任务前，需要先监听mark_que
+    # 具体就是，从mark队列里拿到数字标号
+    # 自增1作为自己的标号
+    # 同时将自己的标号放入mark队列里
+
+    # 先监听mark队列，拿到自己的编号
+    while True:
+        if redis_cli.exists(mark_que):
+            msg = redis_cli.rpop(mark_que)
+            if not msg:
+                continue
+            mark = int(msg.decode()) + 1
+            break
+        time.sleep(random.random())
+    # 放入队列里
+    redis_cli.lpush(mark_que, mark)
+    print('当前slave编号\t{0}'.format(mark))
+    # 完成了后，才开始监听这个任务队列
 
     while True:
-        if redis_cli.exists(que):
-            msg = redis_cli.rpop(que)
+        if redis_cli.exists(task_que):
+            msg = redis_cli.rpop(task_que)
             # 开始分类msg属于什么任务:
             #
-            msg_dict = loads_json(msg)
-            print('收到数据')
+            if not msg:
+                continue
+            msg_dict = loads_json(msg.decode())
+            print('{0}\t收到数据'.format(datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')))
             # 开始分类:
             if msg_dict.get('command'):
                 # 这里commend
@@ -83,8 +106,8 @@ def listen_task_que():
                 # 4. 反馈给seesion/seed模块
                 time.sleep(2)
                 seed = msg_dict
-                # 调度spider
-                sp = SpiderHandler()
+                # 调度spider, 把mark放入实例化中
+                sp = SpiderHandler(mark)
                 sp.receive_seed_and_start_crawl(seed)
                 # 结束上一个，等下一个种子
                 del sp

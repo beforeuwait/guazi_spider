@@ -1,7 +1,7 @@
 import redis
 import time
 import json
-pool = redis.StrictRedis(host='localhost', port=6379, db=1)
+pool = redis.StrictRedis(host='192.168.1.29', port=6379, db=1)
 
 # pool.set('cookie_status', {'0': '1'})
 # pool.delete('cookie_status')
@@ -21,8 +21,8 @@ pool = redis.StrictRedis(host='localhost', port=6379, db=1)
 # print(pool.exists('first'))
 
 while True:
-    if pool.exists('ssnrep'):
-        a = pool.rpop('ssnrep')
+    if pool.exists('TaskQue'):
+        a = pool.rpop('TaskQue')
         print(a)
     time.sleep(0.1)
 

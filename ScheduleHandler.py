@@ -16,6 +16,7 @@
         2. 再设置一个节点seed管理
         3. 再设置一个节点为persistence管理
         4. 该schedule完成使命
+    09-07：
 """
 
 import time
@@ -30,16 +31,28 @@ from utils import wait_for_msg
 
 def guazi_platform():
     """瓜子抓取系统的调度"""
-
+    print('先对各个节点编号')
+    init_mark_que()
     print('系统启动顺序\n\t1.SessionMangement\n\t2.SeedMangement\n\t3.PersistenceMangement')
     # 第一个启动session管理
     start_node_in_order('ssnm')
 
-    # 第二个启动seed管理
+    # # 第二个启动seed管理
     start_node_in_order('sedm')
-
-    # 第三个启动psm管理
+    #
+    # # 第三个启动psm管理
     start_node_in_order('psm')
+
+def init_mark_que():
+    """重置mark_que,并置mark为0"""
+    que = config.mark_que
+    while True:
+        if redis_cli.exists(que):
+            redis_cli.rpop(que)
+            continue
+        break
+    # 重置
+    redis_cli.lpush(config.mark_que, 0)
 
 def start_node_in_order(cmd):
     """

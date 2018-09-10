@@ -14,7 +14,7 @@ import random
 import config
 from config import redis_cli
 import HTTP.requests_server_config as scf
-from HTTP.requests_server_config import logger
+from HTTP.requests_server_config import http_logger as logger
 from HTTP.requests_server_config import filter_dict
 from HTTP.RequestServerApi import RequestAPI
 from utils import dumps_json
@@ -35,8 +35,9 @@ psm_que = config.psm_que
 class SpiderHandler(RequestAPI):
     """继承RequAPI 是因为要使用其diy的方法"""
 
-    def __init__(self):
+    def __init__(self, mark):
         super(SpiderHandler, self).__init__()
+        self.js_file = './js/js_{0}.js'.format(mark)
 
     def receive_seed_and_start_crawl(self, seed):
         """接受种子
@@ -44,24 +45,30 @@ class SpiderHandler(RequestAPI):
         带cookie
         完成请求
         """
+        print('\n开始抓取')
         url = seed.get('url')
         # 一个反馈，请求一个cookie
+        print('请求种子和cookie')
         self.feed_back_seed(seed)
         cookie = wait_for_msg_long(ssn_que_p)
         data = self.user_define_request(url, cookie)
         # 首先验证data是有有效
-        if data:
+        if data and data != ['null']:
             # 先反馈
             self.feed_back_seed(seed)
             # 放数据
             seed.update({'data': data})
             # 丢入持久化队列里
             redis_cli.lpush(psm_que, dumps_json(seed))
+            print('有数据,放入持久化队列')
         else:
             # 反馈该cookie失效
             seed.update({'cookie_status': 1})
+            # 这里犯了一个大错，就是cookie呢  09/10
+            seed.update({'cookie': cookie})
             # 丢入反馈队列里
             self.feed_back_seed(seed)
+            print('完成反馈')
 
         # 他的生命循环完成
         del seed
@@ -112,6 +119,8 @@ class SpiderHandler(RequestAPI):
                 # 反馈回去
                 data = None
                 break
+            else:
+                data = ['null']
             retry -= 1
         return data
 
@@ -162,12 +171,12 @@ class SpiderHandler(RequestAPI):
                 js_text = js[0].replace("xredirect(name,value,url,'https://')", "console.log(value)")
 
                 # 存js
-                with open('./js.js', 'w', encoding='utf8') as f:
+                with open(self.js_file, 'w', encoding='utf8') as f:
                     f.write(js_text)
                     f.write('phantom.exit(0)')
 
                 # 更新session
-                path = os.path.abspath('./js.js')
+                path = os.path.abspath(self.js_file)
                 cmd = "phantomjs {0}".format(path)
                 antipas = os.popen(cmd).read().strip()
                 # 更新cookie

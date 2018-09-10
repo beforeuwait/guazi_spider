@@ -26,7 +26,7 @@ def connect_redis():
     """链接到redis"""
     re = None
     try:
-        re = redis.StrictRedis(host=host, port=port, db=1)
+        re = redis.StrictRedis(host=host, port=port, db=3)
     except Exception as e:
         logger.warning('请启动\tredis\t服务, {0}'.format(e))
     return re
@@ -34,6 +34,10 @@ def connect_redis():
 redis_cli = connect_redis()
 
 #   消息队列名称
+
+# mark_que
+
+mark_que = 'mark'
 
 task_que = 'TaskQue'
 
@@ -53,18 +57,6 @@ sed_req = 'sedreq'
 
 # 持久化队列
 psm_que = 'psmque'
-
-"""
-task_que_fb = 'TaskQueueFB'
-
-cookie_que = 'CookieQue'
-
-ssn_sed_que = 'CookieQue1'
-
-sed_ssn_que = 'CookieQue2'
-
-feedback_que = 'FeedbackQue'
-"""
 
 
 # 消息队列引用

@@ -13,7 +13,9 @@
         todo: 在派发种子一次丢固定的种子数量, 然后监听反馈队列
 """
 
+import time
 import config
+import datetime
 from config import logger
 from config import redis_cli
 from SeedsHandler import seeds_maker
@@ -21,7 +23,7 @@ from SeedsHandler import loads_seed_in_generator
 from SeedsHandler import update_brands_serise
 from utils import loads_json
 from utils import dumps_json
-from utils import wait_for_msg
+from utils import wait_for_msg_long
 
 class SeedsMangement():
     """种子管理器
@@ -116,12 +118,13 @@ class SeedsMangement():
         print('生产种子')
         self.seeds_maker()
         # 完了后先丢20个种子
-        is_break = self.decide_push_seed_2_queue(0)
+        self.decide_push_seed_2_queue(0)
 
         # 开始监听队列，准备投放种子
         que_req = config.sed_req
-        while not is_break:
-            msg = wait_for_msg(que_req)
+        while True:
+            msg = wait_for_msg_long(que_req)
+            print('{0}\t接收反馈'.format(datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')))
             if msg:
                 # 开始处理这个反馈
                 # 主要看 cookie_status
@@ -133,6 +136,8 @@ class SeedsMangement():
                 else:
                     # 通过的话，则上传一个新的种子
                     self.decide_push_seed_2_queue(1)
+                print('完成推送')
+            time.sleep(0.1)
 
 
 """

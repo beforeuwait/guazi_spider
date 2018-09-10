@@ -139,20 +139,17 @@ class SessionMangement():
         如果cookie_status 为 1 就代表需要删除cookiel
         如果出现stop_sign， 则代表slave长时间没有拿到seed后，默认结束
         """
-        is_break = False
         userid_list = []
         for each in msg_list:
             if each.get('cookie_status') == 1:
                 # 这就代表要删除id了
                 userid = each.get('cookie').get('userid')
                 userid_list.append(userid)
-            elif each.get('stop_sign'):
-                is_break = True
+
         # 开始处理
         if userid_list:
             self.logic_delete_cookie(userid_list)
 
-        return is_break
 
 
     def wait_mechanism(self):
@@ -225,7 +222,7 @@ class SessionMangement():
             # 只要有消息来了,先处理,再就发一条cookie出去
             self.deal_feed_back(msg_list)
             self.decide_psuh_cookie_2_que(1)
-            print('完成种子派发\n')
+            print('完成cookie派发\n')
 
             """
             # 当反馈队列里有消息时，激活cookie派发和处理

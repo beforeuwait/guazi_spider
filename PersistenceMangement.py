@@ -48,6 +48,7 @@ def listn_the_psm_que():
             token_set = make_set(token, blank='', index='')
             msg = redis_cli.rpop(psm_que)
             seed = loads_json(translate_2_json_dict(msg))
+            print('{0}\t收到数据'.format(datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')))
             # 接下来就是做持久化处理了
             do_persistence(seed, token_set)
         time.sleep(0.1)
@@ -81,6 +82,8 @@ def do_persistence(seed, id_set):
             # 记录new token
             write_2_file(token, each[0])
             del ctx
+        else:
+            print('数据id已存在')
 
 
 def connect_hdfs():

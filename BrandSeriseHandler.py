@@ -7,6 +7,7 @@
     该脚本为获取瓜子上全部汽车品牌以及车系的数据
 """
 
+import datetime
 from utils import write_2_file
 from utils import loads_json
 from utils import parse_lxml
@@ -100,7 +101,7 @@ def save_serise_data(bid, bname, data, id_set):
 
 def main_get_brands_serises():
     """主逻辑"""
-    print('开始更新品牌')
+    print('{0}\t开始更新品牌'.format(datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')))
     get_all_brands()
-    print('开始更新车系')
+    print('{0}\t开始更新车系'.format(datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')))
     get_all_serise()
