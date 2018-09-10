@@ -210,7 +210,6 @@ class SessionMangement():
         que = config.task_que_fb
         ctx = dumps_json({'ssnm': 'done'})
         redis_cli.lpush(que, ctx)
-
         # 开始监听反馈队列
         print('开始监听ssn_req队列')
         ssn_req = config.ssn_req
@@ -270,3 +269,6 @@ class SessionMangement():
 """
 
 
+if __name__ == '__main__':
+    sm = SessionMangement()
+    sm.session_main_logic()

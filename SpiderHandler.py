@@ -6,6 +6,9 @@
 
     由Slave接受到种子,然后调度该脚本，完成数据请求
     请求后的数据
+
+    09-10: 请求过程反复出现 status_code > 300 的问题
+            第一次求cookie时候，不要顺带求seed
 """
 
 import re
@@ -49,13 +52,13 @@ class SpiderHandler(RequestAPI):
         url = seed.get('url')
         # 一个反馈，请求一个cookie
         print('请求种子和cookie')
-        self.feed_back_seed(seed)
+        self.feed_back_seed(seed, cookie=False)
         cookie = wait_for_msg_long(ssn_que_p)
         data = self.user_define_request(url, cookie)
         # 首先验证data是有有效
         if data and data != ['null']:
             # 先反馈
-            self.feed_back_seed(seed)
+            self.feed_back_seed(seed, cookie=True)
             # 放数据
             seed.update({'data': data})
             # 丢入持久化队列里
@@ -67,17 +70,18 @@ class SpiderHandler(RequestAPI):
             # 这里犯了一个大错，就是cookie呢  09/10
             seed.update({'cookie': cookie})
             # 丢入反馈队列里
-            self.feed_back_seed(seed)
+            self.feed_back_seed(seed, cookie=True)
             print('完成反馈')
 
         # 他的生命循环完成
         del seed
 
 
-    def feed_back_seed(self, seed):
+    def feed_back_seed(self, seed, cookie):
         """向seesion和seed管理反馈"""
         redis_cli.lpush(ssn_que, dumps_json(seed))
-        redis_cli.lpush(sed_que, dumps_json(seed))
+        if cookie:
+            redis_cli.lpush(sed_que, dumps_json(seed))
 
     # 这里需要定制化的请求
     def user_define_request(self, url, cookie_info):
@@ -102,6 +106,7 @@ class SpiderHandler(RequestAPI):
         while retry > 0:
             # 开始请求
             html, status_code = self.deal_request(url)
+            print('重试\t{0}\t状态码\t{1}'.format(retry, status_code))
             # 开始判断
             if status_code < 300:
                 # 这里分两种处理
@@ -220,7 +225,7 @@ class SpiderHandler(RequestAPI):
 
 
 if __name__ == '__main__':
-    seed = {"brand_id": "1199", "brand": "奥迪", "serise_id": "2625", "serise": "奥迪200", "p_type": "合资", "url": "https://www.guazi.com/xinyang/dealrecord?tag_id=2625&date=2018100", "check_city": "xinyang", "date": "2018-1", "cookie": {}, "data": [], "cookie_status": 0, "epoh": 0}
+    seed = {"brand_id": "1199", "brand": "奥迪", "serise_id": "2614", "serise": "奥迪A5", "p_type": "合资", "url": "https://www.guazi.com/xinyang/dealrecord?tag_id=2614&date=2018100", "check_city": "xinyang", "date": "2018-1", "cookie": {}, "data": [], "cookie_status": 0, "epoh": 0}
 
-    sh = SpiderHandler()
+    sh = SpiderHandler(seed)
     sh.receive_seed_and_start_crawl(seed)

@@ -104,7 +104,7 @@ def listen_task_que():
                 # 2. 完成html的请求
                 # 3. data放入psm队列里
                 # 4. 反馈给seesion/seed模块
-                time.sleep(2)
+                time.sleep(random.random()*10)
                 seed = msg_dict
                 # 调度spider, 把mark放入实例化中
                 sp = SpiderHandler(mark)
