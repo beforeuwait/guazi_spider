@@ -166,12 +166,14 @@ class SessionMangement():
         count = redis_cli.get(userid)
         deal_userid = False
         if count:
-            if int(count) < 20:
+            if int(count) < 50:
                 count =int(count) + 1
                 redis_cli.set(userid, count)
             else:
                 redis_cli.set(userid, 0)
                 deal_userid = True
+        else:
+            redis_cli.set(userid, 0)
 
         return deal_userid
 
