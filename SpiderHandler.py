@@ -9,15 +9,25 @@
 
     09-10: 请求过程反复出现 status_code > 300 的问题
             第一次求cookie时候，不要顺带求seed
+
+    09-25:
+        todo: 遇到反馈的cookie比请求的多，这里需要修改，逻辑也需要修改
+        请求方式从session变回request
+    09-26:
+        请求单独拿出来
+
+
 """
 
 import re
 import os
+import time
 import random
 import config
 from config import redis_cli
+from copy import deepcopy
 import HTTP.requests_server_config as scf
-from HTTP.requests_server_config import http_logger as logger
+from HTTP.requests_server_config import logger
 from HTTP.requests_server_config import filter_dict
 from HTTP.RequestServerApi import RequestAPI
 from utils import dumps_json
@@ -30,60 +40,24 @@ ua_list = config.ua_list
 
 # 使用到的队列
 
-ssn_que = config.ssn_req
-ssn_que_p = config.ssn_rep
-sed_que = config.sed_req
-psm_que = config.psm_que
+ssn_2_slv = config.ssn_2_slv
 
-class SpiderHandler(RequestAPI):
-    """继承RequAPI 是因为要使用其diy的方法"""
+slv_2_ssn = config.slv_2_ssn
 
+slv_2_sed = config.slv_2_sed
+
+slv_2_psm = config.slv_2_psm
+
+class RequestModel(RequestAPI):
+    """
+    继承RequesAPI
+    自定义请求过程....
+
+    """
     def __init__(self, mark):
-        super(SpiderHandler, self).__init__()
+        super(RequestModel, self).__init__()
         self.js_file = './js/js_{0}.js'.format(mark)
 
-    def receive_seed_and_start_crawl(self, seed):
-        """接受种子
-        拿出url
-        带cookie
-        完成请求
-        """
-        print('\n开始抓取')
-        url = seed.get('url')
-        # 一个反馈，请求一个cookie
-        print('请求种子和cookie')
-        self.feed_back_seed(seed, cookie=False)
-        cookie = wait_for_msg_long(ssn_que_p)
-        data = self.user_define_request(url, cookie)
-        # 首先验证data是有有效
-        if data and data != ['null']:
-            # 先反馈
-            self.feed_back_seed(seed, cookie=True)
-            # 放数据
-            seed.update({'data': data})
-            # 丢入持久化队列里
-            redis_cli.lpush(psm_que, dumps_json(seed))
-            print('有数据,放入持久化队列')
-        else:
-            # 反馈该cookie失效
-            seed.update({'cookie_status': 1})
-            # 这里犯了一个大错，就是cookie呢  09/10
-            seed.update({'cookie': cookie})
-            # 丢入反馈队列里
-            self.feed_back_seed(seed, cookie=True)
-            print('完成反馈')
-
-        # 他的生命循环完成
-        del seed
-
-
-    def feed_back_seed(self, seed, cookie):
-        """向seesion和seed管理反馈"""
-        redis_cli.lpush(ssn_que, dumps_json(seed))
-        if cookie:
-            redis_cli.lpush(sed_que, dumps_json(seed))
-
-    # 这里需要定制化的请求
     def user_define_request(self, url, cookie_info):
         """
         因为瓜子的请求按照以下流程
@@ -98,14 +72,16 @@ class SpiderHandler(RequestAPI):
         headers.update({'User-Agent': random.choice(ua_list)})
         self.update_headers(headers)
         # 更新cookie
-        self.update_cookie_with_outer({"userid": cookie_info.get("userid"),
-                                       "guaZiUserInfo": cookie_info.get('guaZiUserInfo'),
-                                       "GZ_TOKEN": cookie_info.get("GZ_TOKEN")})
+        # self.update_cookie_with_outer({"userid": cookie_info.get("userid"),
+        #                                "guaZiUserInfo": cookie_info.get('guaZiUserInfo'),
+        #                                "GZ_TOKEN": cookie_info.get("GZ_TOKEN")})
+        # 2018-09-25更新,直接更新所给的cookie
+        self.update_cookie_with_outer(cookie_info)
         retry = config.request_retry
         data = []
         while retry > 0:
             # 开始请求
-            html, status_code = self.deal_request(url)
+            html, status_code = self.do_request(url=url, method="GET", params=None, payloads=None)
             print('重试\t{0}\t状态码\t{1}'.format(retry, status_code))
             # 开始判断
             if status_code < 300:
@@ -114,6 +90,8 @@ class SpiderHandler(RequestAPI):
                     # 走验证
                     self.deal_js(html)
                     # 然后再次请求
+                    time.sleep(1)
+                    retry -= 1
                     continue
                 else:
                     # 拿数据
@@ -122,17 +100,18 @@ class SpiderHandler(RequestAPI):
             elif status_code > 300 and status_code < 400:
                 # 说明该cookie失效
                 # 反馈回去
-                data = None
+                data = ['redirect']
+                # 失效，重试
+                time.sleep(random.random()*10)
                 break
             else:
                 data = ['null']
             retry -= 1
-        return data
 
-    def deal_request(self, url):
-        """负责请求部分"""
-        html, status_code = self.do_request(url=url, method="GET", params=None, payloads=None)
-        return html, status_code
+        # 清理cookie
+        self.discard_cookies()
+
+        return data
 
     def do_request(self, url, method, params, payloads):
         """重写这部分"""
@@ -224,8 +203,92 @@ class SpiderHandler(RequestAPI):
         return data
 
 
-if __name__ == '__main__':
-    seed = {"brand_id": "1199", "brand": "奥迪", "serise_id": "2614", "serise": "奥迪A5", "p_type": "合资", "url": "https://www.guazi.com/xinyang/dealrecord?tag_id=2614&date=2018100", "check_city": "xinyang", "date": "2018-1", "cookie": {}, "data": [], "cookie_status": 0, "epoh": 0}
 
-    sh = SpiderHandler(seed)
-    sh.receive_seed_and_start_crawl(seed)
+class SpiderHandler():
+    """继承RequAPI 是因为要使用其diy的方法"""
+
+    def __init__(self, mark):
+        super(SpiderHandler, self).__init__()
+        self.mark = mark
+        self.js_file = './js/js_{0}.js'.format(mark)
+
+    def demo(self, seed, cookie):
+        url = seed.get('url')
+        rm = RequestModel(self.mark)
+        data = rm.user_define_request(url, cookie)
+        print(data)
+
+    def receive_seed_and_start_crawl(self, seed):
+        """接受种子
+        拿出url
+        带cookie
+        完成请求
+        """
+
+        print('\nspider获取任务')
+        url = seed.get('url')
+        # 一个反馈，请求一个cookie
+        print('请求种子和cookie')
+
+        self.feed_back_seed(seed, session=True, seed=False)
+
+        # 等待cookie
+        cookie = wait_for_msg_long(ssn_2_slv)
+
+        # 实例化请求，解析模块
+        rm = RequestModel(self.mark)
+        data = rm.user_define_request(url, cookie)
+
+        # 首先验证data是有有效
+        if data != ['redirect'] and data != ['null'] and data != []:
+            # 先反馈, 这时候只需要向种子管理反馈
+            self.feed_back_seed(seed, session=False, seed=True)
+            # 放数据
+            seed.update({'data': data})
+            # 丢入持久化队列里
+            print('有数据,放入持久化队列\n')
+            redis_cli.lpush(slv_2_psm, dumps_json(seed))
+
+        elif data == ['redirect']:
+            # 反馈该cookie失效, 需要向两个队列同时反馈
+            seed_b = deepcopy(seed)
+            seed_b.update({'cookie_status': 1})
+            # 这里犯了一个大错，就是cookie呢  09/10
+            seed_b.update({'cookie': cookie})
+            # 丢入反馈队列里
+            self.feed_back_seed(seed_b, session=True, seed=True)
+            print('cookie失效,完成反馈\n')
+            del seed_b
+
+        else:
+            # 没有数据，cookie仍旧是有效的
+            # 只需要向种子管理反馈
+            self.feed_back_seed(seed, session=False, seed=True)
+            print('没有数据, 完成反馈\n')
+
+        # 他的生命循环完成
+        del seed
+        del rm
+
+
+    def feed_back_seed(self, ctx, session, seed):
+        """向seesion和seed管理反馈
+            session=True时候，需要向session管理发送
+            seed=True时候，需要向seed管理推送
+        """
+        if session and seed:
+            redis_cli.lpush(slv_2_sed, dumps_json(ctx))
+            redis_cli.lpush(slv_2_ssn, dumps_json(ctx))
+        elif session and not seed:
+            redis_cli.lpush(slv_2_ssn, dumps_json(ctx))
+        else:
+            redis_cli.lpush(slv_2_sed, dumps_json(ctx))
+        return
+
+
+# if __name__ == '__main__':
+#     seed = {"brand_id": "1199", "brand": "奥迪", "serise_id": "2614", "serise": "奥迪A5", "p_type": "合资", "url": "https://www.guazi.com/xinyang/dealrecord?tag_id=22288&date=2017100", "check_city": "xinyang", "date": "2018-1", "cookie": {}, "data": [], "cookie_status": 0, "epoh": 0}
+#     cookie = {"clueSourceCode": "%2A%2300", "preTime": "%7B%22last%22%3A1537928136%2C%22this%22%3A1537928136%2C%22pre%22%3A1537928136%7D", "GZ_TOKEN": "ef52toYlCiG36xYV8f3011%2BZVJgkcTK8eTkkn31WYGulmX9gKIByhmHZp1d6sg%2BtwJ3L0CbW2avGHetiKQLSM5EvM90l2XbOHFMZs97irvp8flsdbMTJlK1okNg8BAtx6RkhoQ%2BhbwYPAaLDLw", "guaZiUserInfo": "0MSnBkg0hdYQNXvlLOYi2", "userid": "620499844"}
+#     sh = SpiderHandler('1')
+#     # sh.receive_seed_and_start_crawl(seed)
+#     sh.demo(seed, cookie)

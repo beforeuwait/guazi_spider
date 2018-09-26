@@ -185,8 +185,9 @@ def wait_for_msg_long(que):
     while True:
         if redis.exists(que):
             msg = redis.rpop(que)
-            data = loads_json(msg.decode())
-            break
+            if msg:
+                data = loads_json(msg.decode())
+                break
         time.sleep(0.1)
 
     return data

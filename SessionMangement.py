@@ -12,6 +12,9 @@
         cookie的派发是来一个请求发一个
         不用等大家
 
+    # 09-26 需要引入计数原则
+    每个id，出现错误次数，不能一出现就ban，计数，当达到阈值，再ban
+    交给spider去做
 """
 
 import os
@@ -114,7 +117,9 @@ class SessionMangement():
         :param user_ids: 待删除列表
         """
         for user_id in user_ids:
-            self.__check_and_delete_cookie(user_id)
+            deal_userid = self.check_userid_count(user_id)
+            if deal_userid:
+                self.__check_and_delete_cookie(user_id)
 
     def load_cookies_list(self):
         """返回cookie列表
@@ -129,7 +134,7 @@ class SessionMangement():
         """
         将cookie放入队列里
         """
-        que = config.ssn_rep
+        que = config.ssn_2_slv
         cookie = loads_json(cookie)
         redis_cli.lpush(que, dumps_json(cookie))
 
@@ -139,25 +144,43 @@ class SessionMangement():
         如果cookie_status 为 1 就代表需要删除cookiel
         如果出现stop_sign， 则代表slave长时间没有拿到seed后，默认结束
         """
+        is_deal = False
         userid_list = []
+        # 如果是带cookie字段，只处理，不返回
         for each in msg_list:
             if each.get('cookie_status') == 1:
+                is_deal = True
                 # 这就代表要删除id了
                 userid = each.get('cookie').get('userid')
                 userid_list.append(userid)
-
         # 开始处理
         if userid_list:
             self.logic_delete_cookie(userid_list)
 
+        return is_deal
 
+    def check_userid_count(self, userid):
+        """查询该id的次数
+        每个id重试次数为20次
+        """
+        count = redis_cli.get(userid)
+        deal_userid = False
+        if count:
+            if int(count) < 20:
+                count =int(count) + 1
+                redis_cli.set(userid, count)
+            else:
+                redis_cli.set(userid, 0)
+                deal_userid = True
+
+        return deal_userid
 
     def wait_mechanism(self):
         """等待机制
         当第一个出现的情况下被触发
         """
         count = 10
-        que = config.ssn_req
+        que = config.slv_2_ssn
         msg_list = wait_for_msg_list(que, count)
         return msg_list
 
@@ -212,15 +235,16 @@ class SessionMangement():
         redis_cli.lpush(que, ctx)
         # 开始监听反馈队列
         print('开始监听ssn_req队列')
-        ssn_req = config.ssn_req
+        slv_2_ssn = config.slv_2_ssn
         while True:
             msg_list = []
-            msg = wait_for_msg_long(ssn_req)
+            msg = wait_for_msg_long(slv_2_ssn)
             print(datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S'), '\t接受反馈')
             msg_list.append(msg)
             # 只要有消息来了,先处理,再就发一条cookie出去
-            self.deal_feed_back(msg_list)
-            self.decide_psuh_cookie_2_que(1)
+            is_deal = self.deal_feed_back(msg_list)
+            if not is_deal:
+                self.decide_psuh_cookie_2_que(1)
             print('完成cookie派发\n')
 
             """

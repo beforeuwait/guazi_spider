@@ -24,7 +24,7 @@ from utils import dumps_json
 from pyhdfs import HdfsClient
 
 # 持久化队列
-psm_que = config.psm_que
+psm_que = config.slv_2_psm
 
 data_file = config.data_file
 

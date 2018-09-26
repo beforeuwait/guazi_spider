@@ -43,9 +43,14 @@ class RequestAPI(GeneralRequest):
                                 params=params, 
                                 method=method, 
                                 payloads=payloads)
+        # 在通用的一次性请求里，到这里是要关闭session的
+        # 清理cookie
+        self.discard_cookies()
+        self.close_session()
+
         return html
     
-    def user_define_request(self):
+    def user_define_request(self, **kwargs):
         """这个方法的意义在于用户自己去设计请求过程
         一般登录啊
         绕过js啊
@@ -53,33 +58,3 @@ class RequestAPI(GeneralRequest):
         都这这里自己定义
         """
         pass
-
-
-"""
-def temp_test_unit():
-    \"""测试该库
-    
-    test_1: 
-        url = 'http://www.baidu.com'
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",
-            "Host": "www.baidu.com",
-            "Upgrade-Insecure-Requests": "1"
-        }
-    
-
-    \"""
-    url = 'http://www.baidu.com'
-    headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36",
-            "Host": "www.baidu.com",
-            "Upgrade-Insecure-Requests": "1"
-        }
-    api = RequestAPI()
-    html = api.receive_and_request(url=url, headers=headers, method='GET')
-    print(html)
-
-
-if __name__ == '__main__':
-    temp_test_unit()
-"""

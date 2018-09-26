@@ -2,15 +2,15 @@
 
 import os
 import redis
-
 os.chdir(os.path.split(os.path.abspath(__file__))[0])
 
 import logging
+from UserAgent import user_agent_list
 # 日志部分
 
 logger = logging.getLogger('main')
 logger.setLevel(logging.INFO)
-handler = logging.FileHandler('logging.log')
+handler = logging.FileHandler('./log/system.log')
 fmt = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 handler.setFormatter(fmt)
 logger.addHandler(handler)
@@ -26,7 +26,7 @@ def connect_redis():
     """链接到redis"""
     re = None
     try:
-        re = redis.StrictRedis(host=host, port=port, db=3)
+        re = redis.StrictRedis(host=host, port=port, db=5)
     except Exception as e:
         logger.warning('请启动\tredis\t服务, {0}'.format(e))
     return re
@@ -39,24 +39,40 @@ redis_cli = connect_redis()
 
 mark_que = 'mark'
 
-task_que = 'TaskQue'
+task_que = 'taskque'
 
-task_que_fb = 'TaskQueFb'
+task_que_fb = 'taskquefb'
 
-# session请求队列
-ssn_req = 'ssnreq'
+# # session请求队列
+# ssn_req = 'ssnreq'
+#
+# # session回复队列
+# ssn_rep = 'ssnrep'
+#
+# # session状态队列
+# ssn_status = 'ssnsts'
+#
+# # seed请求队列
+# sed_req = 'sedreq'
+#
+# # 持久化队列
+# psm_que = 'psmque'
 
-# session回复队列
-ssn_rep = 'ssnrep'
 
-# session状态队列
-ssn_status = 'ssnsts'
+# session-slave
+ssn_2_slv = 'ssnp'
 
-# seed请求队列
-sed_req = 'sedreq'
+# slave-session
+slv_2_ssn = 'ssnq'
+
+# seed-slave
+sed_2_slv = 'taskque'
+
+# slave-seed
+slv_2_sed = 'sedq'
 
 # 持久化队列
-psm_que = 'psmque'
+slv_2_psm = 'psmque'
 
 
 # 消息队列引用
@@ -89,33 +105,13 @@ seeds_store = './DB/seeds_store.txt'
 headers = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
-    "Connection": "keep-alive",
     "Host": "www.guazi.com",
     "Referer": "https://www.guazi.com",
     "Upgrade-Insecure-Requests": "1",
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.99 Safari/537.36"
 }
 
-ua_list = [
-            "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/22.0.1207.1 Safari/537.1",
-            "Mozilla/5.0 (X11; CrOS i686 2268.111.0) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.57 Safari/536.11",
-            "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1092.0 Safari/536.6",
-            "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.6 (KHTML, like Gecko) Chrome/20.0.1090.0 Safari/536.6",
-            "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.1 (KHTML, like Gecko) Chrome/19.77.34.5 Safari/537.1",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.9 Safari/536.5",
-            "Mozilla/5.0 (Windows NT 6.0) AppleWebKit/536.5 (KHTML, like Gecko) Chrome/19.0.1084.36 Safari/536.5",
-            "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
-            "Mozilla/5.0 (Windows NT 5.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_0) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1063.0 Safari/536.3",
-            "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",
-            "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1062.0 Safari/536.3",
-            "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
-            "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
-            "Mozilla/5.0 (Windows NT 6.1) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.1 Safari/536.3",
-            "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/536.3 (KHTML, like Gecko) Chrome/19.0.1061.0 Safari/536.3",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24",
-            "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/535.24 (KHTML, like Gecko) Chrome/19.0.1055.1 Safari/535.24",
-        ]
+ua_list = user_agent_list
 
 request_retry = 2
 

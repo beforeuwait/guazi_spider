@@ -72,7 +72,7 @@ class SeedsMangement():
         """拿到种子，将种子推入队列里"""
         is_break = False
         if count == 0:
-            count = 20
+            count = 10
 
         num = 1
         while num <= count:
@@ -121,9 +121,9 @@ class SeedsMangement():
         self.decide_push_seed_2_queue(0)
 
         # 开始监听队列，准备投放种子
-        que_req = config.sed_req
+        slv_2_sed = config.slv_2_sed
         while True:
-            msg = wait_for_msg_long(que_req)
+            msg = wait_for_msg_long(slv_2_sed)
             print('{0}\t接收反馈'.format(datetime.datetime.today().strftime('%Y-%m-%d %H:%M:%S')))
             if msg:
                 # 开始处理这个反馈
